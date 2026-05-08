@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEP单词卡 学期整合版</title>
+<style>
+/* === 样式保持一致且优化 === */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f0ece6;color:#222;min-height:100vh}
+.top-bar{background:#fff;border-bottom:2px solid #ddd;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+.main{max-width:500px;margin:0 auto;padding:16px}
+.progress-info{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px}
+.progress-track{height:3px;background:#ddd;border-radius:2px;margin-bottom:14px}
+.progress-fill{height:100%;background:#444;transition:width .2s}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
+.stat-box{text-align:center;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:8px 2px}
+.stat-num{font-size:18px;font-weight:700}
+.stat-label{font-size:10px;color:#999}
+.card-box{width:100%;height:240px;position:relative;cursor:pointer;perspective:1000px;margin-bottom:14px}
+.card-inner{width:100%;height:100%;position:relative;transition:transform 0.6s;transform-style:preserve-3d}
+.card-side{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;border:2px solid #ddd;background:#fff}
+.card-back{background:#f8fdf5;border-color:#a8d98a;transform:rotateY(180deg)}
+.flipped .card-inner{transform:rotateY(180deg)}
+.w-en{font-size:36px;font-weight:700;word-break:break-all}
+.w-cn{font-size:26px;font-weight:700}
+.ctrl-row{display:flex;gap:8px;margin-bottom:14px}
+.btn-ctrl{flex:1;padding:12px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;font-weight:600}
+.btn-ctrl.primary{background:#333;color:#fff;border-color:#333}
+.tabs{display:flex;gap:6px}
+.tab{flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;text-align:center}
+.tab.on{background:#333;color:#fff}
+.test-area,.rev-area{display:none;background:#fff;border:1px solid #ddd;border-radius:12px;padding:20px;margin-bottom:14px;text-align:center}
+.test-in{width:100%;padding:12px;font-size:18px;border:2px solid #ccc;border-radius:8px;margin:10px 0;text-align:center}
+.btn-row{display:flex;gap:10px;margin-top:15px;width:100%}
+.btn-mk{flex:1;padding:12px;border-radius:20px;border:none;font-weight:600;cursor:pointer}
+.btn-no{background:#f8bfbf;color:#d44}.btn-yes{background:#5a5;color:#fff}
+select{padding:8px;border-radius:6px;border:1px solid #ccc;width:180px}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>📚 PEP 单词大通关</h1>
+  <select id="selGrade" onchange="onGradeChange()"></select>
+</div>
+
+<div class="main">
+  <div class="progress-info"><span id="pLabel">正在加载...</span><span id="uLabel">---</span></div>
+  <div class="progress-track"><div class="progress-fill" id="pBar" style="width:0%"></div></div>
+
+  <div class="stats">
+    <div class="stat-box"><div class="stat-num" id="stT">0</div><div class="stat-label">本次已学</div></div>
+    <div class="stat-box"><div class="stat-num" id="stK" style="color:#5a5">0</div><div class="stat-label">认识</div></div>
+    <div class="stat-box"><div class="stat-num" id="stX" style="color:#c44">0</div><div class="stat-label">需复习</div></div>
+    <div class="stat-box"><div class="stat-num" id="stR">-</div><div class="stat-label">正确率</div></div>
+  </div>
+
+  <div id="cardArea">
+    <div class="card-box" id="cardBox" onclick="onCardTap()">
+      <div class="card-inner" id="cardInner">
+        <div class="card-side card-front">
+          <div class="w-en" id="wEn">...</div>
+          <div id="wPh" style="color:#bbb;margin-top:8px;font-size:14px"></div>
+        </div>
+        <div class="card-side card-back">
+          <div class="w-cn" id="wCn"></div>
+          <div id="wPos" style="color:#888;margin-top:8px"></div>
+          <div class="btn-row">
+            <button class="btn-mk btn-no" onclick="event.stopPropagation();doMark(false)">✗ 不认识</button>
+            <button class="btn-mk btn-yes" onclick="event.stopPropagation();doMark(true)">✓ 认识</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-row">
+      <button class="btn-ctrl" onclick="goPrev()">上一个</button>
+      <button class="btn-ctrl primary" onclick="doFlip()">翻转卡片</button>
+      <button class="btn-ctrl" onclick="goNext()">下一个</button>
+    </div>
+  </div>
+
+  <div id="testArea" class="test-area">
+    <div id="tQ" style="font-size:20px;font-weight:700;margin-bottom:10px"></div>
+    <input class="test-in" id="tIn" placeholder="请拼写英文单词" autocomplete="off">
+    <div class="btn-row">
+        <button class="btn-ctrl primary" onclick="doCheck()">检查答案</button>
+        <button class="btn-ctrl" onclick="goNext()">跳过</button>
+    </div>
+  </div>
+
+  <div id="revArea" class="rev-area">
+      <h3 style="margin-bottom:10px;font-size:16px">我的复习清单</h3>
+      <div id="revList" style="text-align:left;font-size:14px;line-height:2"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tMem" onclick="setMode('mem')">📖 记忆</button>
+    <button class="tab" id="tTest" onclick="setMode('test')">✍️ 测试</button>
+    <button class="tab" id="tRev" onclick="setMode('rev')">📝 错题</button>
+  </div>
+</div>
+
+<script>
+const RAW_DATA = {
+"3A": { name: "三年级上册", words: [
+    {en:"ruler",cn:"尺子",ph:"/ˈruːlə(r)/",pos:"n."},{en:"pencil",cn:"铅笔",ph:"/ˈpensl/",pos:"n."},{en:"eraser",cn:"橡皮",ph:"/ɪˈreɪzə(r)/",pos:"n."},{en:"crayon",cn:"蜡笔",ph:"/ˈkreɪən/",pos:"n."},{en:"bag",cn:"包",ph:"/bæg/",pos:"n."},{en:"pen",cn:"钢笔",ph:"/pen/",pos:"n."},{en:"pencil box",cn:"铅笔盒",ph:"/",pos:"n."},{en:"book",cn:"书",ph:"/bʊk/",pos:"n."},{en:"no",cn:"不",ph:"/nəʊ/",pos:"adv."},{en:"your",cn:"你(们)的",ph:"/jɔː(r)/",pos:"pron."},{en:"Unit 2",cn:"颜色单元",ph:"/",pos:""},{en:"red",cn:"红色",ph:"/red/",pos:"adj."},{en:"green",cn:"绿色",ph:"/ɡriːn/",pos:"adj."},{en:"yellow",cn:"黄色",ph:"/ˈjeləʊ/",pos:"adj."},{en:"blue",cn:"蓝色",ph:"/bluː/",pos:"adj."},{en:"black",cn:"黑色",ph:"/blæk/",pos:"adj."},{en:"brown",cn:"棕色",ph:"/braʊn/",pos:"adj."},{en:"white",cn:"白色",ph:"/waɪt/",pos:"adj."},{en:"orange",cn:"橙色",ph:"/ˈɒrɪndʒ/",pos:"adj."},{en:"OK",cn:"好;行",ph:"/əʊˈkeɪ/",pos:"interj."},{en:"mum",cn:"妈妈",ph:"/mʌm/",pos:"n."},{en:"face",cn:"脸",ph:"/feɪs/",pos:"n."},{en:"ear",cn:"耳朵",ph:"/ɪə(r)/",pos:"n."},{en:"eye",cn:"眼睛",ph:"/aɪ/",pos:"n."},{en:"nose",cn:"鼻子",ph:"/neʊz/",pos:"n."},{en:"mouth",cn:"嘴",ph:"/maʊθ/",pos:"n."},{en:"arm",cn:"胳臂",ph:"/ɑːm/",pos:"n."},{en:"hand",cn:"手",ph:"/hænd/",pos:"n."},{en:"head",cn:"头",ph:"/hed/",pos:"n."},{en:"body",cn:"身体",ph:"/ˈbɒdi/",pos:"n."},{en:"leg",cn:"腿",ph:"/leɡ/",pos:"n."},{en:"foot",cn:"脚",ph:"/fʊt/",pos:"n."},{en:"school",cn:"学校",ph:"/skuːl/",pos:"n."},{en:"duck",cn:"鸭子",ph:"/dʌk/",pos:"n."},{en:"pig",cn:"猪",ph:"/pɪɡ/",pos:"n."},{en:"cat",cn:"猫",ph:"/kæt/",pos:"n."},{en:"bear",cn:"熊",ph:"/beə(r)/",pos:"n."},{en:"dog",cn:"狗",ph:"/dɒɡ/",pos:"n."},{en:"elephant",cn:"大象",ph:"/ˈelɪfənt/",pos:"n."},{en:"monkey",cn:"猴子",ph:"/ˈmʌŋki/",pos:"n."},{en:"bird",cn:"鸟",ph:"/bɜːd/",pos:"n."},{en:"tiger",cn:"老虎",ph:"/ˈtaɪɡə(r)/",pos:"n."},{en:"panda",cn:"大熊猫",ph:"/ˈpændə/",pos:"n."},{en:"zoo",cn:"动物园",ph:"/zuː/",pos:"n."},{en:"funny",cn:"滑稽的;好笑的",ph:"/ˈfʌni/",pos:"adj."},{en:"bread",cn:"面包",ph:"/bred/",pos:"n."},{en:"juice",cn:"果汁",ph:"/dʒuːs/",pos:"n."},{en:"egg",cn:"蛋",ph:"/eɡ/",pos:"n."},{en:"milk",cn:"牛奶",ph:"/mɪlk/",pos:"n."},{en:"water",cn:"水",ph:"/ˈwɔːtə(r)/",pos:"n."},{en:"cake",cn:"蛋糕",ph:"/keɪk/",pos:"n."},{en:"fish",cn:"鱼",ph:"/fɪʃ/",pos:"n."},{en:"rice",cn:"米饭",ph:"/raɪs/",pos:"n."},{en:"one",cn:"一",ph:"/wʌn/",pos:"num."},{en:"two",cn:"二",ph:"/tuː/",pos:"num."},{en:"three",cn:"三",ph:"/θriː/",pos:"num."},{en:"four",cn:"四",ph:"/fɔː(r)/",pos:"num."},{en:"five",cn:"五",ph:"/faɪv/",pos:"num."},{en:"six",cn:"六",ph:"/sɪks/",pos:"num."},{en:"seven",cn:"七",ph:"/sevn/",pos:"num."},{en:"eight",cn:"八",ph:"/eɪt/",pos:"num."},{en:"nine",cn:"九",ph:"/naɪn/",pos:"num."},{en:"ten",cn:"十",ph:"/ten/",pos:"num."},{en:"brother",cn:"兄;弟",ph:"/ˈbrʌðə(r)/",pos:"n."},{en:"sister",cn:"姐;妹",ph:"/ˈsɪstə(r)/",pos:"n."},{en:"plate",cn:"盘子",ph:"/pleɪt/",pos:"n."}
+]},
+"3B": { name: "三年级下册", words: [
+    {en:"UK",cn:"英国",ph:"/",pos:"n."},{en:"Canada",cn:"加拿大",ph:"/ˈkænədə/",pos:"n."},{en:"USA",cn:"美国",ph:"/",pos:"n."},{en:"China",cn:"中国",ph:"/ˈtʃaɪnə/",pos:"n."},{en:"she",cn:"她",ph:"/ʃiː/",pos:"pron."},{en:"student",cn:"学生",ph:"/ˈstjuːdnt/",pos:"n."},{en:"pupil",cn:"小学生",ph:"/ˈpjuːpl/",pos:"n."},{en:"he",cn:"他",ph:"/hiː/",pos:"pron."},{en:"teacher",cn:"教师",ph:"/ˈtiːtʃə(r)/",pos:"n."},{en:"boy",cn:"男孩",ph:"/bɔɪ/",pos:"n."},{en:"and",cn:"和;与",ph:"/ænd/",pos:"conj."},{en:"girl",cn:"女孩",ph:"/ɡɜːl/",pos:"n."},{en:"new",cn:"新的",ph:"/njuː/",pos:"adj."},{en:"friend",cn:"朋友",ph:"/frend/",pos:"n."},{en:"today",cn:"今天",ph:"/təˈdeɪ/",pos:"adv."},{en:"father",cn:"父亲;爸爸",ph:"/ˈfɑːðə(r)/",pos:"n."},{en:"dad",cn:"爸爸(口语)",ph:"/dæd/",pos:"n."},{en:"man",cn:"男人",ph:"/mæn/",pos:"n."},{en:"woman",cn:"女人",ph:"/ˈwʊmən/",pos:"n."},{en:"mother",cn:"母亲;妈妈",ph:"/ˈmʌðə(r)/",pos:"n."},{en:"grandmother",cn:"(外)祖母",ph:"/ˈɡrænmʌðə(r)/",pos:"n."},{en:"grandma",cn:"祖母(口语)",ph:"/ˈɡrænmɑː/",pos:"n."},{en:"grandfather",cn:"(外)祖父",ph:"/ˈɡrænfɑːðə(r)/",pos:"n."},{en:"grandpa",cn:"祖父(口语)",ph:"/ˈɡrænpɑː/",pos:"n."},{en:"family",cn:"家;家庭",ph:"/ˈfæməli/",pos:"n."},{en:"thin",cn:"瘦的",ph:"/θɪn/",pos:"adj."},{en:"fat",cn:"肥的",ph:"/fæt/",pos:"adj."},{en:"tall",cn:"高的",ph:"/tɔːl/",pos:"adj."},{en:"short",cn:"矮的;短的",ph:"/ʃɔːt/",pos:"adj."},{en:"long",cn:"长的",ph:"/lɒŋ/",pos:"adj."},{en:"small",cn:"小的",ph:"/smɔːl/",pos:"adj."},{en:"big",cn:"大的",ph:"/bɪɡ/",pos:"adj."},{en:"giraffe",cn:"长颈鹿",ph:"/dʒɪˈrɑːf/",pos:"n."},{en:"so",cn:"这么;那么",ph:"/səʊ/",pos:"adv."},{en:"children",cn:"儿童(child复数)",ph:"/ˈtɪldrən/",pos:"n."},{en:"tail",cn:"尾巴",ph:"/teɪl/",pos:"n."},{en:"on",cn:"在……上面",ph:"/ɒn/",pos:"prep."},{en:"in",cn:"在……里面",ph:"/ɪn/",pos:"prep."},{en:"under",cn:"在……下面",ph:"/ˈʌndə(r)/",pos:"prep."},{en:"chair",cn:"椅子",ph:"/tʃeə(r)/",pos:"n."},{en:"desk",cn:"书桌",ph:"/desk/",pos:"n."},{en:"cap",cn:"帽子",ph:"/kæp/",pos:"n."},{en:"ball",cn:"球",ph:"/bɔːl/",pos:"n."},{en:"car",cn:"小汽车",ph:"/kɑː(r)/",pos:"n."},{en:"boat",cn:"小船",ph:"/bəʊt/",pos:"n."},{en:"map",cn:"地图",ph:"/mæp/",pos:"n."},{en:"toy",cn:"玩具",ph:"/tɔɪ/",pos:"n."},{en:"box",cn:"盒;箱",ph:"/bɒks/",pos:"n."},{en:"pear",cn:"梨",ph:"/peə(r)/",pos:"n."},{en:"apple",cn:"苹果",ph:"/ˈæpl/",pos:"n."},{en:"orange",cn:"橙子",ph:"/ˈɒrɪndʒ/",pos:"n."},{en:"banana",cn:"香蕉",ph:"/bəˈnɑːnə/",pos:"n."},{en:"watermelon",cn:"西瓜",ph:"/ˈwɔːtəmelən/",pos:"n."},{en:"strawberry",cn:"草莓",ph:"/ˈstrɔːbəri/",pos:"n."},{en:"grape",cn:"葡萄",ph:"/ɡreɪp/",pos:"n."},{en:"buy",cn:"买",ph:"/baɪ/",pos:"v."},{en:"fruit",cn:"水果",ph:"/fruːt/",pos:"n."},{en:"eleven",cn:"十一",ph:"/ɪˈlevn/",pos:"num."},{en:"twelve",cn:"十二",ph:"/twelv/",pos:"num."},{en:"thirteen",cn:"十三",ph:"/ˌθɜːˈtiːn/",pos:"num."},{en:"fourteen",cn:"十四",ph:"/ˌfɔːˈtiːn/",pos:"num."},{en:"fifteen",cn:"十五",ph:"/ˌfɪfˈtiːn/",pos:"num."},{en:"sixteen",cn:"十六",ph:"/ˌsɪksˈtiːn/",pos:"num."},{en:"seventeen",cn:"十七",ph:"/ˌsevnˈtiːn/",pos:"num."},{en:"eighteen",cn:"十八",ph:"/ˌeɪˈtiːn/",pos:"num."},{en:"nineteen",cn:"十九",ph:"/ˌnaɪnˈtiːn/",pos:"num."},{en:"twenty",cn:"二十",ph:"/ˈtwenti/",pos:"num."},{en:"kite",cn:"风筝",ph:"/kaɪt/",pos:"n."},{en:"beautiful",cn:"美丽的",ph:"/ˈbjuːtɪfl/",pos:"adj."}
+]},
+"4A": { name: "四年级上册", words: [
+    {en:"classroom",cn:"教室",ph:"/ˈklɑːsruːm/",pos:"n."},{en:"window",cn:"窗户",ph:"/ˈwɪndəʊ/",pos:"n."},{en:"blackboard",cn:"黑板",ph:"/ˈblækbɔːd/",pos:"n."},{en:"light",cn:"电灯",ph:"/laɪt/",pos:"n."},{en:"picture",cn:"图画",ph:"/ˈpɪktʃə(r)/",pos:"n."},{en:"door",cn:"门",ph:"/dɔː(r)/",pos:"n."},{en:"teacher's desk",cn:"讲台",ph:"/",pos:"n."},{en:"computer",cn:"计算机",ph:"/kəmˈpjuːtə(r)/",pos:"n."},{en:"fan",cn:"风扇",ph:"/fæn/",pos:"n."},{en:"wall",cn:"墙壁",ph:"/wɔːl/",pos:"n."},{en:"floor",cn:"地板",ph:"/flɔː(r)/",pos:"n."},{en:"really",cn:"真的",ph:"/ˈriːəli/",pos:"adv."},{en:"near",cn:"距离近",ph:"/nɪə(r)/",pos:"prep."},{en:"TV",cn:"电视",ph:"/",pos:"n."},{en:"clean",cn:"打扫",ph:"/kliːn/",pos:"v."},{en:"help",cn:"帮助",ph:"/help/",pos:"v."},{en:"schoolbag",cn:"书包",ph:"/ˈskuːlbæɡ/",pos:"n."},{en:"maths book",cn:"数学书",ph:"/",pos:"n."},{en:"English book",cn:"英语书",ph:"/",pos:"n."},{en:"Chinese book",cn:"语文书",ph:"/",pos:"n."},{en:"storybook",cn:"故事书",ph:"/ˈstrɔːribʊk/",pos:"n."},{en:"candy",cn:"糖果",ph:"/ˈkændi/",pos:"n."},{en:"notebook",cn:"笔记本",ph:"/ˈnəʊtbʊk/",pos:"n."},{en:"toy",cn:"玩具",ph:"/tɔɪ/",pos:"n."},{en:"key",cn:"钥匙",ph:"/kiː/",pos:"n."},{en:"wow",cn:"哇;呀",ph:"/waʊ/",pos:"interj."},{en:"lost",cn:"丢失",ph:"/lɒst/",pos:"v."},{en:"so much",cn:"非常地",ph:"/",pos:"adv."},{en:"cute",cn:"可爱的",ph:"/kjuːt/",pos:"adj."},{en:"strong",cn:"强壮的",ph:"/strɒŋ/",pos:"adj."},{en:"friendly",cn:"友好的",ph:"/ˈfrendli/",pos:"adj."},{en:"quiet",cn:"安静的",ph:"/ˈkwaɪət/",pos:"adj."},{en:"hair",cn:"头发",ph:"/heə(r)/",pos:"n."},{en:"shoe",cn:"鞋",ph:"/ʃuː/",pos:"n."},{en:"glasses",cn:"眼镜",ph:"/ˈɡlɑːsɪz/",pos:"n."},{en:"his",cn:"他的",ph:"/hɪz/",pos:"pron."},{en:"or",cn:"或者",ph:"/ɔː(r)/",pos:"conj."},{en:"right",cn:"正确的;对的",ph:"/raɪt/",pos:"adj."},{en:"hat",cn:"帽子",ph:"/hæt/",pos:"n."},{en:"her",cn:"她的",ph:"/hɜː(r)/",pos:"pron."},{en:"bedroom",cn:"卧室",ph:"/ˈbedruːm/",pos:"n."},{en:"living room",cn:"客厅;起居室",ph:"/",pos:"n."},{en:"study",cn:"书房",ph:"/ˈstʌdi/",pos:"n."},{en:"kitchen",cn:"厨房",ph:"/ˈkɪtʃɪn/",pos:"n."},{en:"bathroom",cn:"浴室",ph:"/ˈbɑːθruːm/",pos:"n."},{en:"bed",cn:"床",ph:"/bed/",pos:"n."},{en:"phone",cn:"电话",ph:"/fəʊn/",pos:"n."},{en:"table",cn:"桌子",ph:"/ˈteɪbl/",pos:"n."},{en:"sofa",cn:"长沙发",ph:"/ˈsəʊfə/",pos:"n."},{en:"fridge",cn:"冰箱",ph:"/frɪdʒ/",pos:"n."},{en:"find",cn:"找到",ph:"/faɪnd/",pos:"v."},{en:"them",cn:"他(她、它)们",ph:"/ðem/",pos:"pron."},{en:"beef",cn:"牛肉",ph:"/biːf/",pos:"n."},{en:"chicken",cn:"鸡肉",ph:"/ˈtʃɪkɪn/",pos:"n."},{en:"noodles",cn:"面条",ph:"/ˈnuːdlz/",pos:"n."},{en:"soup",cn:"汤",ph:"/suːp/",pos:"n."},{en:"vegetable",cn:"蔬菜",ph:"/ˈvedʒtəbl/",pos:"n."},{en:"chopsticks",cn:"筷子",ph:"/ˈtʃɒpstɪks/",pos:"n."},{en:"bowl",cn:"碗",ph:"/bəʊl/",pos:"n."},{en:"fork",cn:"餐叉",ph:"/fɔːk/",pos:"n."},{en:"knife",cn:"刀",ph:"/naɪf/",pos:"n."},{en:"spoon",cn:"勺",ph:"/spuːn/",pos:"n."},{en:"dinner",cn:"正餐",ph:"/ˈdɪnə(r)/",pos:"n."},{en:"ready",cn:"准备好",ph:"/ˈredi/",pos:"adj."},{en:"help yourself",cn:"为(自己)取用",ph:"/",pos:"phrase"},{en:"pass",cn:"给;递",ph:"/pɑːs/",pos:"v."},{en:"try",cn:"试;尝试",ph:"/traɪ/",pos:"v."},{en:"parents",cn:"父母",ph:"/ˈpeərənts/",pos:"n."},{en:"cousin",cn:"同辈表亲(堂亲)",ph:"/ˈkʌzn/",pos:"n."},{en:"uncle",cn:"叔叔",ph:"/ˈʌŋkl/",pos:"n."},{en:"aunt",cn:"阿姨",ph:"/ɑːnt/",pos:"n."},{en:"baby brother",cn:"婴儿小弟弟",ph:"/",pos:"n."},{en:"doctor",cn:"医生",ph:"/ˈdɒktə(r)/",pos:"n."},{en:"cook",cn:"厨师",ph:"/ʊk/",pos:"n."},{en:"driver",cn:"司机",ph:"/ˈdraɪvə(r)/",pos:"n."},{en:"farmer",cn:"农民",ph:"/ˈfɑːmə(r)/",pos:"n."},{en:"nurse",cn:"护士",ph:"/nɜːs/",pos:"n."},{en:"people",cn:"人们",ph:"/ˈpiːpl/",pos:"n."},{en:"but",cn:"但是",ph:"/bʌt/",pos:"conj."},{en:"little",cn:"小的",ph:"/ˈlɪtl/",pos:"adj."},{en:"puppy",cn:"小狗",ph:"/ˈpʌpi/",pos:"n."},{en:"football player",cn:"足球运动员",ph:"/",pos:"n."},{en:"job",cn:"工作",ph:"/dʒɒb/",pos:"n."},{en:"basketball",cn:"篮球",ph:"/ˈbɑːskɪtbɔːl/",pos:"n."}
+]},
+"4B": { name: "四年级下册", words: [
+    {en:"first floor",cn:"一楼",ph:"/",pos:"n."},{en:"second floor",cn:"二楼",ph:"/",pos:"n."},{en:"teachers' office",cn:"教师办公室",ph:"/",pos:"n."},{en:"library",cn:"图书馆",ph:"/ˈlaɪbrəri/",pos:"n."},{en:"playground",cn:"操场",ph:"/ˈpleɪɡraʊnd/",pos:"n."},{en:"computer room",cn:"计算机房",ph:"/",pos:"n."},{en:"art room",cn:"美术教室",ph:"/",pos:"n."},{en:"music room",cn:"音乐教室",ph:"/",pos:"n."},{en:"next to",cn:"紧邻",ph:"/",pos:"prep."},{en:"homework",cn:"作业",ph:"/ˈhəʊmwɜːk/",pos:"n."},{en:"class",cn:"班;班级",ph:"/klɑːs/",pos:"n."},{en:"forty",cn:"四十",ph:"/ˈfɔːti/",pos:"num."},{en:"way",cn:"方向",ph:"/weɪ/",pos:"n."},{en:"fly",cn:"放(风筝等)",ph:"/flaɪ/",pos:"v."},{en:"love",cn:"爱",ph:"/lʌv/",pos:"v."},{en:"breakfast",cn:"早餐",ph:"/ˈbrekfəst/",pos:"n."},{en:"English class",cn:"英语课",ph:"/",pos:"n."},{en:"lunch",cn:"午餐",ph:"/lʌntʃ/",pos:"n."},{en:"music class",cn:"音乐课",ph:"/",pos:"n."},{en:"PE class",cn:"体育课",ph:"/",pos:"n."},{en:"dinner",cn:"正餐",ph:"/ˈdɪnə(r)/",pos:"n."},{en:"get up",cn:"起床",ph:"/",pos:"v."},{en:"go to school",cn:"去上学",ph:"/",pos:"v."},{en:"go home",cn:"回家",ph:"/",pos:"v."},{en:"go to bed",cn:"上床睡觉",ph:"/",pos:"v."},{en:"over",cn:"结束",ph:"/ˈəʊvə(r)/",pos:"adj."},{en:"now",cn:"现在;目前",ph:"/naʊ/",pos:"adv."},{en:"o'clock",cn:"……点钟",ph:"/əˈklɒk/",pos:"adv."},{en:"kid",cn:"小孩",ph:"/kɪd/",pos:"n."},{en:"thirty",cn:"三十",ph:"/ˈθɜːti/",pos:"num."},{en:"hurry up",cn:"快点",ph:"/",pos:"phrase"},{en:"come on",cn:"快;加油",ph:"/",pos:"phrase"},{en:"just a minute",cn:"稍等一会儿",ph:"/",pos:"phrase"},{en:"cold",cn:"冷的",ph:"/kəʊld/",pos:"adj."},{en:"cool",cn:"凉的",ph:"/kuːl/",pos:"adj."},{en:"warm",cn:"温暖的",ph:"/wɔːm/",pos:"adj."},{en:"hot",cn:"热的",ph:"/hɒt/",pos:"adj."},{en:"sunny",cn:"阳光充足的",ph:"/ˈsʌni/",pos:"adj."},{en:"windy",cn:"多风的",ph:"/ˈwindi/",pos:"adj."},{en:"cloudy",cn:"阴天的",ph:"/ˈklaʊdi/",pos:"adj."},{en:"snowy",cn:"下雪的",ph:"/ˈsnəʊi/",pos:"adj."},{en:"rainy",cn:"多雨的",ph:"/ˈreɪni/",pos:"adj."},{en:"outside",cn:"在户外",ph:"/ˌaʊtˈsaɪd/",pos:"adv."},{en:"be careful",cn:"小心",ph:"/",pos:"v."},{en:"weather",cn:"天气",ph:"/ˈweðə(r)/",pos:"n."},{en:"New York",cn:"纽约",ph:"/",pos:"n."},{en:"how about",cn:"……怎么样?",ph:"/",pos:"phrase"},{en:"degree",cn:"度",ph:"/dɪˈɡriː/",pos:"n."},{en:"world",cn:"世界",ph:"/wɜːld/",pos:"n."},{en:"London",cn:"伦敦",ph:"/ˈlʌndən/",pos:"n."},{en:"Moscow",cn:"莫斯科",ph:"/ˈmɒskəʊ/",pos:"n."},{en:"Singapore",cn:"新加坡",ph:"/",pos:"n."},{en:"Sydney",cn:"悉尼",ph:"/ˈsidni/",pos:"n."},{en:"tomato",cn:"西红柿",ph:"/təˈmɑːtəʊ/",pos:"n."},{en:"potato",cn:"马铃薯",ph:"/pəˈteɪtəʊ/",pos:"n."},{en:"green beans",cn:"豆角",ph:"/",pos:"n."},{en:"carrot",cn:"胡萝卜",ph:"/ˈkærət/",pos:"n."},{en:"horse",cn:"马",ph:"/hɔːs/",pos:"n."},{en:"cow",cn:"母牛;奶牛",ph:"/kaʊ/",pos:"n."},{en:"sheep",cn:"绵羊",ph:"/ʃiːp/",pos:"n."},{en:"hen",cn:"母鸡",ph:"/hen/",pos:"n."},{en:"these",cn:"这些",ph:"/ðiːz/",pos:"pron."},{en:"yum",cn:"味道很好",ph:"/jʌm/",pos:"interj."},{en:"animal",cn:"动物",ph:"/ˈænɪml/",pos:"n."},{en:"those",cn:"那些",ph:"/ðəʊz/",pos:"pron."},{en:"garden",cn:"花园;菜园",ph:"/ˈɡɑːdn/",pos:"n."},{en:"farm",cn:"农场",ph:"/fɑːm/",pos:"n."},{en:"goat",cn:"山羊",ph:"/ɡəʊt/",pos:"n."},{en:"eat",cn:"吃",ph:"/iːt/",pos:"v."},{en:"clothes",cn:"衣服",ph:"/kləʊðz/",pos:"n."},{en:"pants",cn:"裤子",ph:"/pænts/",pos:"n."},{en:"hat",cn:"帽子",ph:"/hæt/",pos:"n."},{en:"dress",cn:"连衣裙",ph:"/dres/",pos:"n."},{en:"skirt",cn:"女裙",ph:"/skɜːt/",pos:"n."},{en:"coat",cn:"外套;大衣",ph:"/kəʊt/",pos:"n."},{en:"sweater",cn:"毛衣",ph:"/ˈswetə(r)/",pos:"n."},{en:"sock",cn:"短袜",ph:"/sɒk/",pos:"n."},{en:"shorts",cn:"短裤",ph:"/ʃɔːts/",pos:"n."},{en:"jacket",cn:"夹克衫",ph:"/ˈdʒækɪt/",pos:"n."},{en:"shirt",cn:"衬衫",ph:"/ʃɜːt/",pos:"n."},{en:"yours",cn:"你的;你们的",ph:"/jɔːz/",pos:"pron."},{en:"whose",cn:"谁的",ph:"/huːz/",pos:"pron."},{en:"mine",cn:"我的",ph:"/maɪn/",pos:"pron."},{en:"pack",cn:"收拾(行李)",ph:"/pæk/",pos:"v."},{en:"wait",cn:"等待",ph:"/weɪt/",pos:"v."},{en:"glove",cn:"手套",ph:"/ɡlʌv/",pos:"n."},{en:"scarf",cn:"围巾",ph:"/skɑːf/",pos:"n."},{en:"umbrella",cn:"雨伞",ph:"/ʌmˈbrelə/",pos:"n."},{en:"sunglasses",cn:"太阳镜",ph:"/ˈsʌnɡlɑːsɪz/",pos:"n."},{en:"pretty",cn:"美观的;精致的",ph:"/ˈprɪti/",pos:"adj."},{en:"expensive",cn:"昂贵的",ph:"/ɪkˈspensɪv/",pos:"adj."},{en:"cheap",cn:"便宜的",ph:"/tʃiːp/",pos:"adj."},{en:"nice",cn:"好的",ph:"/naɪs/",pos:"adj."},{en:"try on",cn:"试穿",ph:"/",pos:"v."},{en:"size",cn:"尺码;号",ph:"/saɪz/",pos:"n."},{en:"of course",cn:"当然",ph:"/",pos:"phrase"},{en:"too",cn:"太;过于",ph:"/tuː/",pos:"adv."},{en:"just",cn:"正好;恰好",ph:"/dʒʌst/",pos:"adv."},{en:"how much",cn:"多少钱",ph:"/",pos:"adv."},{en:"dollar",cn:"元(美元等)",ph:"/ˈdɒlə(r)/",pos:"n."},{en:"sale",cn:"大减价",ph:"/seɪl/",pos:"n."},{en:"more",cn:"更多的",ph:"/mɔː(r)/",pos:"adj."}
+]},
+"5A": { name: "五年级上册", words: [
+    {en:"old",cn:"老的;年纪大的",ph:"/əʊld/",pos:"adj."},{en:"young",cn:"年轻的",ph:"/jʌŋ/",pos:"adj."},{en:"funny",cn:"滑稽的;可笑的",ph:"/ˈfʌni/",pos:"adj."},{en:"kind",cn:"体贴的;慈祥的",ph:"/kaɪnd/",pos:"adj."},{en:"strict",cn:"严厉的",ph:"/strɪkt/",pos:"adj."},{en:"polite",cn:"有礼貌的",ph:"/pəˈlaɪt/",pos:"adj."},{en:"hard-working",cn:"工作努力的",ph:"/ˌhɑːdˈwɜːkɪŋ/",pos:"adj."},{en:"helpful",cn:"有帮助的",ph:"/ˈhelpfl/",pos:"adj."},{en:"clever",cn:"聪明的",ph:"/ˈklevə(r)/",pos:"adj."},{en:"shy",cn:"腼腆的;羞怯的",ph:"/ʃaɪ/",pos:"adj."},{en:"know",cn:"知道;了解",ph:"/nəʊ/",pos:"v."},{en:"our",cn:"我们的",ph:"/ˈaʊə(r)/",pos:"pron."},{en:"will",cn:"将要",ph:"/wɪl/",pos:"v."},{en:"sometimes",cn:"有时;间或",ph:"/ˈsʌmtaɪmz/",pos:"adv."},{en:"robot",cn:"机器人",ph:"/ˈrəʊbɒt/",pos:"n."},{en:"him",cn:"他(宾语)",ph:"/hɪm/",pos:"pron."},{en:"speak",cn:"会说;会讲",ph:"/spiːk/",pos:"v."},{en:"finish",cn:"完成;做好",ph:"/ˈɪnɪʃ/",pos:"v."},{en:"Monday",cn:"星期一",ph:"/ˈmʌndeɪ/",pos:"n."},{en:"Tuesday",cn:"星期二",ph:"/ˈtjuːzdeɪ/",pos:"n."},{en:"Wednesday",cn:"星期三",ph:"/ˈwenzdeɪ/",pos:"n."},{en:"Thursday",cn:"星期四",ph:"/ˈθɜːzdeɪ/",pos:"n."},{en:"Friday",cn:"星期五",ph:"/ˈfraɪdeɪ/",pos:"n."},{en:"Saturday",cn:"星期六",ph:"/ˈsætədeɪ/",pos:"n."},{en:"Sunday",cn:"星期日",ph:"/ˈsʌndeɪ/",pos:"n."},{en:"weekend",cn:"周末",ph:"/ˌwiːkˈend/",pos:"n."},{en:"wash",cn:"洗",ph:"/wɒʃ/",pos:"v."},{en:"wash my clothes",cn:"洗我的衣服",ph:"/",pos:"phrase"},{en:"watch",cn:"看",ph:"/wɒtʃ/",pos:"v."},{en:"watch TV",cn:"看电视",ph:"/",pos:"phrase"},{en:"do",cn:"做;干",ph:"/duː/",pos:"v."},{en:"do homework",cn:"做作业",ph:"/",pos:"phrase"},{en:"read",cn:"看;读",ph:"/riːd/",pos:"v."},{en:"read books",cn:"看书",ph:"/",pos:"phrase"},{en:"play",cn:"踢;玩;参加",ph:"/pleɪ/",pos:"v."},{en:"play football",cn:"踢足球",ph:"/",pos:"phrase"},{en:"cooking",cn:"烹饪",ph:"/ˈkʊkɪŋ/",pos:"n."},{en:"often",cn:"时常;常常",ph:"/ˈɒfn/",pos:"adv."},{en:"park",cn:"公园",ph:"/pɑːk/",pos:"n."},{en:"tired",cn:"疲倦的",ph:"/ˈtaɪəd/",pos:"adj."},{en:"sport",cn:"体育运动",ph:"/spɔːt/",pos:"n."},{en:"play sports",cn:"做体育运动",ph:"/",pos:"phrase"},{en:"should",cn:"应该;应当",ph:"/ʃʊd/",pos:"v."},{en:"every",cn:"每一个;每个",ph:"/ˈevri/",pos:"adj."},{en:"day",cn:"一天;一日",ph:"/deɪ/",pos:"n."},{en:"sandwich",cn:"三明治",ph:"/ˈsænwɪtʃ/",pos:"n."},{en:"salad",cn:"蔬菜沙拉",ph:"/ˈæləd/",pos:"n."},{en:"hamburger",cn:"汉堡包",ph:"/ˈhæmbɜːɡə(r)/",pos:"n."},{en:"ice cream",cn:"冰激凌",ph:"/",pos:"n."},{en:"tea",cn:"茶;茶水",ph:"/tiː/",pos:"n."},{en:"fresh",cn:"新鲜的",ph:"/freʃ/",pos:"adj."},{en:"healthy",cn:"健康的",ph:"/ˈhelθi/",pos:"adj."},{en:"delicious",cn:"美味的",ph:"/dɪˈlɪʃəs/",pos:"adj."},{en:"hot",cn:"辣的",ph:"/hɒt/",pos:"adj."},{en:"sweet",cn:"甜的",ph:"/swiːt/",pos:"adj."},{en:"drink",cn:"喝;饮",ph:"/drɪŋk/",pos:"v."},{en:"thirsty",cn:"口渴的",ph:"/ˈθɜːsti/",pos:"adj."},{en:"favourite",cn:"特别喜爱的",ph:"/ˈfeɪvərɪt/",pos:"adj."},{en:"food",cn:"食物",ph:"/fuːd/",pos:"n."},{en:"onion",cn:"洋葱",ph:"/ˈʌnjən/",pos:"n."},{en:"sing",cn:"唱歌",ph:"/sɪŋ/",pos:"v."},{en:"song",cn:"歌曲",ph:"/sɒŋ/",pos:"n."},{en:"sing English songs",cn:"唱英文歌曲",ph:"/",pos:"phrase"},{en:"play the pipa",cn:"弹琵琶",ph:"/",pos:"phrase"},{en:"kung fu",cn:"功夫;武术",ph:"/ˌkʌŋ ˈfuː/",pos:"n."},{en:"do kung fu",cn:"练功夫",ph:"/",pos:"phrase"},{en:"dance",cn:"跳舞",ph:"/dɑːns/",pos:"v."},{en:"draw",cn:"画",ph:"/drɔː/",pos:"v."},{en:"cartoon",cn:"漫画",ph:"/kɑːˈtuːn/",pos:"n."},{en:"draw cartoons",cn:"画漫画",ph:"/",pos:"phrase"},{en:"cook",cn:"烹饪",ph:"/kʊk/",pos:"v."},{en:"swim",cn:"游泳",ph:"/swɪm/",pos:"v."},{en:"play basketball",cn:"打篮球",ph:"/",pos:"phrase"},{en:"play ping-pong",cn:"打乒乓球",ph:"/",pos:"phrase"},{en:"speak English",cn:"说英语",ph:"/",pos:"phrase"},{en:"party",cn:"聚会;派对",ph:"/ˈpɑːti/",pos:"n."},{en:"next",cn:"下一个的",ph:"/nekst/",pos:"adj."},{en:"wonderful",cn:"极好的",ph:"/ˈwʌndəfl/",pos:"adj."},{en:"learn",cn:"学;学习",ph:"/lɜːn/",pos:"v."},{en:"any",cn:"任何的",ph:"/ˈeni/",pos:"adj."},{en:"problem",cn:"问题",ph:"/ˈprɒbləm/",pos:"n."},{en:"no problem",cn:"没问题",ph:"/",pos:"phrase"},{en:"want",cn:"要;想要",ph:"/wɒnt/",pos:"v."},{en:"send",cn:"邮寄;发送",ph:"/send/",pos:"v."},{en:"email",cn:"电子邮件",ph:"/ˈiːmeɪl/",pos:"n."},{en:"clock",cn:"时钟",ph:"/klɒk/",pos:"n."},{en:"plant",cn:"植物",ph:"/plɑːnt/",pos:"n."},{en:"bottle",cn:"瓶子",ph:"/ˈbɒtl/",pos:"n."},{en:"water bottle",cn:"水瓶",ph:"/",pos:"n."},{en:"bike",cn:"自行车",ph:"/baɪk/",pos:"n."},{en:"photo",cn:"照片;相片",ph:"/ˈfəʊtəʊ/",pos:"n."},{en:"front",cn:"正面",ph:"/frʌnt/",pos:"n."},{en:"in front of",cn:"在……前面",ph:"/",pos:"prep."},{en:"between",cn:"在……中间",ph:"/bɪˈtwiːn/",pos:"prep."},{en:"above",cn:"在……上面",ph:"/əˈbʌv/",pos:"prep."},{en:"beside",cn:"在旁边",ph:"/bɪˈsaɪd/",pos:"prep."},{en:"behind",cn:"在……后面",ph:"/bɪˈhaɪnd/",pos:"prep."},{en:"there",cn:"那儿",ph:"/ðeə(r)/",pos:"adv."},{en:"grandparent",cn:"(外)祖父,母",ph:"/ˈɡrænpeərənt/",pos:"n."},{en:"their",cn:"他们的",ph:"/ðeə(r)/",pos:"pron."},{en:"house",cn:"房屋;房子",ph:"/haʊs/",pos:"n."},{en:"lots of",cn:"大量;许多",ph:"/",pos:"phrase"},{en:"flower",cn:"花;花朵",ph:"/ˈflaʊə(r)/",pos:"n."},{en:"move",cn:"搬家",ph:"/muːv/",pos:"v."},{en:"dirty",cn:"肮脏的",ph:"/ˈdɜːti/",pos:"adj."},{en:"everywhere",cn:"处处;到处",ph:"/ˈevriweə(r)/",pos:"adv."},{en:"mouse",cn:"老鼠",ph:"/maʊs/",pos:"n."},{en:"live",cn:"居住",ph:"/lɪv/",pos:"v."},{en:"nature",cn:"大自然",ph:"/ˈneɪtʃə(r)/",pos:"n."},{en:"forest",cn:"森林;林区",ph:"/ˈfɒrɪst/",pos:"n."},{en:"river",cn:"河;江",ph:"/ˈrɪvə(r)/",pos:"n."},{en:"lake",cn:"湖;湖泊",ph:"/leɪk/",pos:"n."},{en:"mountain",cn:"高山;山岳",ph:"/ˈmaʊntən/",pos:"n."},{en:"hill",cn:"小山",ph:"/hɪl/",pos:"n."},{en:"tree",cn:"树;树木",ph:"/triː/",pos:"n."},{en:"bridge",cn:"桥",ph:"/brɪdʒ/",pos:"n."},{en:"building",cn:"建筑物;房子",ph:"/ˈbɪldɪŋ/",pos:"n."},{en:"village",cn:"村庄;村镇",ph:"/ˈvɪlɪdʒ/",pos:"n."},{en:"boating",cn:"划船",ph:"/ˈbəʊtɪŋ/",pos:"n."},{en:"go boating",cn:"去划船",ph:"/",pos:"phrase"},{en:"rabbit",cn:"兔子",ph:"/ˈræbɪt/",pos:"n."},{en:"high",cn:"高的",ph:"/haɪ/",pos:"adj."}
+]},
+"5B": { name: "五年级下册", words: [
+    {en:"eat breakfast",cn:"吃早饭",ph:"/",pos:"v."},{en:"have class",cn:"上课",ph:"/",pos:"v."},{en:"play sports",cn:"进行体育运动",ph:"/",pos:"v."},{en:"exercise",cn:"活动;运动",ph:"/ˈeksəsaɪz/",pos:"n./v."},{en:"do morning exercise",cn:"做早操",ph:"/",pos:"phrase"},{en:"eat dinner",cn:"吃晚饭",ph:"/",pos:"v."},{en:"clean my room",cn:"打扫我的房间",ph:"/",pos:"v."},{en:"go for a walk",cn:"散步",ph:"/",pos:"v."},{en:"go shopping",cn:"去购物",ph:"/",pos:"v."},{en:"take",cn:"学习;上(课)",ph:"/teɪk/",pos:"v."},{en:"dancing",cn:"跳舞;舞蹈",ph:"/ˈdɑːnsɪŋ/",pos:"n."},{en:"take a dancing class",cn:"上舞蹈课",ph:"/",pos:"phrase"},{en:"when",cn:"什么时候;何时",ph:"/wen/",pos:"adv."},{en:"after",cn:"在(时间)之后",ph:"/ˈɑːftə(r)/",pos:"prep."},{en:"start",cn:"开始",ph:"/stɑːt/",pos:"v."},{en:"usually",cn:"通常地;惯常的",ph:"/ˈjuːʒuəli/",pos:"adv."},{en:"Spain",cn:"西班牙",ph:"/speɪn/",pos:"n."},{en:"late",cn:"晚;迟",ph:"/leɪt/",pos:"adj."},{en:"a.m.",cn:"午前;上午",ph:"/ˌeɪ ˈem/",pos:"abbr."},{en:"p.m.",cn:"午后;下午",ph:"/ˌpiː ˈem/",pos:"abbr."},{en:"why",cn:"为什么",ph:"/waɪ/",pos:"adv."},{en:"shop",cn:"去买东西;购物",ph:"/ʃɒp/",pos:"v."},{en:"work",cn:"工作",ph:"/wɜːk/",pos:"v."},{en:"last",cn:"上一个的",ph:"/lɑːst/",pos:"adj."},{en:"sound",cn:"听起来好像",ph:"/saʊnd/",pos:"v."},{en:"also",cn:"还;也",ph:"/ˈɔːlsəʊ/",pos:"adv."},{en:"busy",cn:"忙的",ph:"/ˈbɪzi/",pos:"adj."},{en:"need",cn:"需要",ph:"/niːd/",pos:"v."},{en:"play",cn:"戏剧;剧本",ph:"/pleɪ/",pos:"n."},{en:"letter",cn:"信",ph:"/ˈletə(r)/",pos:"n."},{en:"live",cn:"居住",ph:"/lɪv/",pos:"v."},{en:"island",cn:"岛",ph:"/ˈaɪlənd/",pos:"n."},{en:"always",cn:"总是;一直",ph:"/ˈɔːlweɪz/",pos:"adv."},{en:"cave",cn:"山洞;洞穴",ph:"/keɪv/",pos:"n."},{en:"go swimming",cn:"去游泳",ph:"/",pos:"phrase"},{en:"win",cn:"获胜",ph:"/wɪn/",pos:"v."},{en:"spring",cn:"春天",ph:"/sprɪŋ/",pos:"n."},{en:"summer",cn:"夏天",ph:"/ˈsʌmə(r)/",pos:"n."},{en:"autumn",cn:"秋天",ph:"/ˈɔːtəm/",pos:"n."},{en:"winter",cn:"冬天",ph:"/ˈwɪntə(r)/",pos:"n."},{en:"season",cn:"季节",ph:"/ˈsiːzn/",pos:"n."},{en:"picnic",cn:"野餐",ph:"/ˈpɪknɪk/",pos:"n."},{en:"go on a picnic",cn:"去野餐",ph:"/",pos:"phrase"},{en:"pick",cn:"摘;采集",ph:"/pɪk/",pos:"v."},{en:"pick apples",cn:"摘苹果",ph:"/",pos:"phrase"},{en:"snowman",cn:"雪人",ph:"/ˈsnəʊmæn/",pos:"n."},{en:"make a snowman",cn:"堆雪人",ph:"/",pos:"phrase"},{en:"which",cn:"哪一个",ph:"/wɪtʃ/",pos:"pron."},{en:"best",cn:"最",ph:"/best/",pos:"adv."},{en:"snow",cn:"雪",ph:"/snəʊ/",pos:"n."},{en:"good job",cn:"做得好",ph:"/",pos:"phrase"},{en:"because",cn:"因为",ph:"/bɪˈkɒz/",pos:"conj."},{en:"vacation",cn:"假期",ph:"/veɪˈkeɪʃn/",pos:"n."},{en:"all",cn:"全;完全",ph:"/ɔːl/",pos:"adj."},{en:"pink",cn:"粉色",ph:"/pɪŋ/",pos:"adj."},{en:"lovely",cn:"可爱的;美丽的",ph:"/ˈlʌvli/",pos:"adj."},{en:"leaf",cn:"叶子",ph:"/liːf/",pos:"n."},{en:"fall",cn:"落下;秋天",ph:"/fɔːl/",pos:"v./n."},{en:"paint",cn:"用颜料绘画",ph:"/peɪnt/",pos:"v."},{en:"January",cn:"一月",ph:"/ˈdʒænjuəri/",pos:"n."},{en:"February",cn:"二月",ph:"/ˈfebruəri/",pos:"n."},{en:"March",cn:"三月",ph:"/mɑːtʃ/",pos:"n."},{en:"April",cn:"四月",ph:"/ˈeɪprəl/",pos:"n."},{en:"May",cn:"五月",ph:"/meɪ/",pos:"n."},{en:"June",cn:"六月",ph:"/dʒuːn/",pos:"n."},{en:"July",cn:"七月",ph:"/dʒʊˈlaɪ/",pos:"n."},{en:"August",cn:"八月",ph:"/ˈɔːɡəst/",pos:"n."},{en:"September",cn:"九月",ph:"/sepˈtembə(r)/",pos:"n."},{en:"October",cn:"十月",ph:"/ɒkˈtəʊbə(r)/",pos:"n."},{en:"November",cn:"十一月",ph:"/nəʊˈvembə(r)/",pos:"n."},{en:"December",cn:"十二月",ph:"/dɪˈsembə(r)/",pos:"n."},{en:"few",cn:"不多;很少",ph:"/fjuː/",pos:"adj."},{en:"a few",cn:"一些",ph:"/",pos:"phrase"},{en:"thing",cn:"事情",ph:"/θɪŋ/",pos:"n."},{en:"meet",cn:"集会;开会",ph:"/miːt/",pos:"v."},{en:"sports meet",cn:"运动会",ph:"/",pos:"n."},{en:"trip",cn:"旅行",ph:"/trɪp/",pos:"n."},{en:"year",cn:"年",ph:"/jɪə(r)/",pos:"n."},{en:"plant",cn:"种植",ph:"/plɑːnt/",pos:"v."},{en:"contest",cn:"比赛;竞赛",ph:"/ˈkɒntest/",pos:"n."},{en:"the Great Wall",cn:"长城",ph:"/",pos:"n."},{en:"national",cn:"国家的",ph:"/ˈnæʃnəl/",pos:"adj."},{en:"National Day",cn:"国庆日",ph:"/",pos:"n."},{en:"American",cn:"美国的",ph:"/əˈmerɪkən/",pos:"adj."},{en:"Thanksgiving",cn:"感恩节",ph:"/ˌθæŋksˈɡɪvɪŋ/",pos:"n."},{en:"Christmas",cn:"圣诞节",ph:"/ˈkrɪsməs/",pos:"n."},{en:"game",cn:"游戏",ph:"/ɡeɪm/",pos:"n."},{en:"look for",cn:"寻找",ph:"/",pos:"phrase"},{en:"riddle",cn:"谜;谜语",ph:"/ˈrɪdl/",pos:"n."},{en:"act",cn:"扮演",ph:"/ækt/",pos:"v."},{en:"act out",cn:"表演出来",ph:"/",pos:"phrase"},{en:"RSVP",cn:"请赐复",ph:"/",pos:"abbr."},{en:"by",cn:"在……之前",ph:"/baɪ/",pos:"prep."},{en:"first",cn:"第一",ph:"/fɜːst/",pos:"num."},{en:"second",cn:"第二",ph:"/ˈsekənd/",pos:"num."},{en:"third",cn:"第三",ph:"/θɜːd/",pos:"num."},{en:"fourth",cn:"第四",ph:"/fɔːθ/",pos:"num."},{en:"fifth",cn:"第五",ph:"/fɪfθ/",pos:"num."},{en:"sixth",cn:"第六",ph:"/sɪks/",pos:"num."},{en:"twelfth",cn:"第十二",ph:"/twelfθ/",pos:"num."},{en:"twentieth",cn:"第二十",ph:"/ˈtwentiəθ/",pos:"num."},{en:"twenty-first",cn:"第二十一",ph:"/",pos:"num."},{en:"twenty-third",cn:"第二十三",ph:"/",pos:"num."},{en:"thirtieth",cn:"第三十",ph:"/ˈθɜːtiəθ/",pos:"num."},{en:"special",cn:"特殊的;特别的",ph:"/ˈspeʃl/",pos:"adj."},{en:"show",cn:"展览",ph:"/ʃəʊ/",pos:"n."},{en:"festival",cn:"节日",ph:"/ˈfestɪvl/",pos:"n."},{en:"kitten",cn:"小猫",ph:"/ˈkɪtn/",pos:"n."},{en:"diary",cn:"日记",ph:"/ˈdaɪəri/",pos:"n."},{en:"still",cn:"仍然;依旧",ph:"/stɪl/",pos:"adv."},{en:"noise",cn:"声音;噪音",ph:"/nɔɪz/",pos:"n."},{en:"fur",cn:"浓密的软毛",ph:"/fɜː(r)/",pos:"n."},{en:"open",cn:"开着的",ph:"/ˈəʊpən/",pos:"adj."},{en:"walk",cn:"行走",ph:"/wɔːk/",pos:"v."},{en:"mine",cn:"我的",ph:"/maɪn/",pos:"pron."},{en:"yours",cn:"你(们)的",ph:"/jɔːz/",pos:"pron."},{en:"his",cn:"他的",ph:"/hɪz/",pos:"pron."},{en:"hers",cn:"她的",ph:"/hɜːz/",pos:"pron."},{en:"theirs",cn:"他(她、它)们的",ph:"/ðeəz/",pos:"pron."},{en:"ours",cn:"我们的",ph:"/ˈaʊəz/",pos:"pron."},{en:"climbing",cn:"(正在)攀爬",ph:"/",pos:"v."},{en:"eating",cn:"吃",ph:"/",pos:"v."},{en:"playing",cn:"(正在)玩耍",ph:"/",pos:"v."},{en:"jumping",cn:"(正在)跳",ph:"/",pos:"v."},{en:"drinking",cn:"(正在)喝",ph:"/",pos:"v."},{en:"sleeping",cn:"(正在)睡觉",ph:"/",pos:"v."},{en:"each",cn:"每一;各个",ph:"/iːtʃ/",pos:"adj."},{en:"other",cn:"其他",ph:"/ˈʌðə(r)/",pos:"adj."},{en:"each other",cn:"相互",ph:"/",pos:"phrase"},{en:"excited",cn:"兴奋的;激动的",ph:"/ɪkˈsaɪtɪd/",pos:"adj."},{en:"like",cn:"像……那样",ph:"/laɪk/",pos:"prep."},{en:"doing morning exercises",cn:"(正在)做早操",ph:"/",pos:"phrase"},{en:"having class",cn:"(正在)上课",ph:"/",pos:"phrase"},{en:"eating lunch",cn:"(正在)吃午饭",ph:"/",pos:"phrase"},{en:"reading a book",cn:"(正在)看书",ph:"/",pos:"phrase"},{en:"listening to music",cn:"正在听音乐",ph:"/",pos:"phrase"},{en:"keep",cn:"保持某种状态",ph:"/kiːp/",pos:"v."},{en:"keep to the right",cn:"靠右",ph:"/",pos:"phrase"},{en:"keep your desk clean",cn:"保持你的课桌干净",ph:"/",pos:"phrase"},{en:"talk quietly",cn:"小声讲话",ph:"/",pos:"phrase"},{en:"turn",cn:"顺序",ph:"/tɜːn/",pos:"n."},{en:"take turns",cn:"按顺序来",ph:"/",pos:"phrase"},{en:"bamboo",cn:"竹子",ph:"/ˌbæmˈbuː/",pos:"n."},{en:"its",cn:"它的",ph:"/ɪts/",pos:"pron."},{en:"show",cn:"给人看",ph:"/ʃəʊ/",pos:"v."},{en:"anything",cn:"任何事物",ph:"/ˈeniθɪŋ/",pos:"pron."},{en:"else",cn:"另外;其他",ph:"/els/",pos:"adj."},{en:"exhibition",cn:"展览",ph:"/ˌeksɪˈbɪʃn/",pos:"n."},{en:"say",cn:"说;讲",ph:"/seɪ/",pos:"v."},{en:"have a look",cn:"看一看",ph:"/",pos:"phrase"},{en:"sushi",cn:"寿司",ph:"/ˈsuːʃi/",pos:"n."},{en:"teach",cn:"教",ph:"/tiːtʃ/",pos:"v."},{en:"sure",cn:"当然",ph:"/ʃʊə(r)/",pos:"adv."},{en:"Canadian",cn:"加拿大的",ph:"/kəˈneɪdiən/",pos:"adj."},{en:"Spanish",cn:"西班牙的",ph:"/ˈspænɪʃ/",pos:"adj."}
+]},
+"6A": { name: "六年级上册", words: [
+    {en:"science",cn:"科学",ph:"/ˈsaɪəns/",pos:"n."},{en:"museum",cn:"博物馆",ph:"/mjuˈziːəm/",pos:"n."},{en:"post office",cn:"邮局",ph:"/",pos:"n."},{en:"bookstore",cn:"书店",ph:"/ˈbʊkstɔː(r)/",pos:"n."},{en:"cinema",cn:"电影院",ph:"/ˈsɪnɪmə/",pos:"n."},{en:"hospital",cn:"医院",ph:"/ˈhɒspɪtl/",pos:"n."},{en:"crossing",cn:"十字路口",ph:"/ˈkrɒsɪŋ/",pos:"n."},{en:"turn",cn:"转弯",ph:"/tɜːn/",pos:"v."},{en:"left",cn:"左",ph:"/left/",pos:"n./adj."},{en:"straight",cn:"笔直的",ph:"/streɪt/",pos:"adv."},{en:"right",cn:"右",ph:"/raɪt/",pos:"n./adj."},{en:"ask",cn:"问",ph:"/ɑːsk/",pos:"v."},{en:"sir",cn:"先生",ph:"/sɜː(r)/",pos:"n."},{en:"interesting",cn:"有趣的",ph:"/ˈɪntrəstɪŋ/",pos:"adj."},{en:"Italian",cn:"意大利的",ph:"/ɪˈtæliən/",pos:"adj."},{en:"restaurant",cn:"餐馆",ph:"/ˈrestərɒnt/",pos:"n."},{en:"pizza",cn:"比萨饼",ph:"/ˈpiːtsə/",pos:"n."},{en:"street",cn:"大街;街道",ph:"/striːt/",pos:"n."},{en:"get",cn:"到达",ph:"/ɡet/",pos:"v."},{en:"GPS",cn:"全球定位系统",ph:"/",pos:"n."},{en:"gave",cn:"提供;给",ph:"/ɡeɪv/",pos:"v."},{en:"feature",cn:"特点",ph:"/ˈfiːtʃə(r)/",pos:"n."},{en:"follow",cn:"跟着",ph:"/ˈfɒləʊ/",pos:"v."},{en:"far",cn:"较远的",ph:"/fɑː(r)/",pos:"adj."},{en:"tell",cn:"告诉",ph:"/tel/",pos:"v."},{en:"on foot",cn:"步行",ph:"/",pos:"adv."},{en:"by",cn:"乘",ph:"/baɪ/",pos:"prep."},{en:"bus",cn:"公共汽车",ph:"/bʌs/",pos:"n."},{en:"plane",cn:"飞机",ph:"/pleɪn/",pos:"n."},{en:"taxi",cn:"出租汽车",ph:"/ˈtæksi/",pos:"n."},{en:"ship",cn:"船",ph:"/ʃɪp/",pos:"n."},{en:"subway",cn:"地铁",ph:"/ˈsʌbweɪ/",pos:"n."},{en:"train",cn:"火车",ph:"/treɪn/",pos:"n."},{en:"slow",cn:"慢的",ph:"/sləʊ/",pos:"adj."},{en:"down",cn:"减少;降低",ph:"/daʊn/",pos:"adv."},{en:"slow down",cn:"慢下来",ph:"/",pos:"phrase"},{en:"stop",cn:"停下",ph:"/stɒp/",pos:"v."},{en:"Mrs",cn:"夫人",ph:"/ˈmɪsɪz/",pos:"n."},{en:"early",cn:"早到的",ph:"/ˈɜːli/",pos:"adj."},{en:"helmet",cn:"头盔",ph:"/ˈhelmɪt/",pos:"n."},{en:"must",cn:"必须",ph:"/mʌst/",pos:"v."},{en:"wear",cn:"戴",ph:"/weə(r)/",pos:"v."},{en:"attention",cn:"注意",ph:"/əˈtenʃn/",pos:"n."},{en:"pay attention to",cn:"注意",ph:"/",pos:"phrase"},{en:"traffic",cn:"交通",ph:"/ˈtræfɪk/",pos:"n."},{en:"traffic lights",cn:"交通信号灯",ph:"/",pos:"n."},{en:"sled",cn:"雪橇",ph:"/sled/",pos:"n."},{en:"fast",cn:"快的",ph:"/fɑːst/",pos:"adj."},{en:"ferry",cn:"轮渡",ph:"/ˈferi/",pos:"n."},{en:"visit",cn:"拜访",ph:"/ˈvɪzɪt/",pos:"v."},{en:"film",cn:"电影",ph:"/fɪlm/",pos:"n."},{en:"see a film",cn:"看电影",ph:"/",pos:"phrase"},{en:"trip",cn:"旅行",ph:"/trɪp/",pos:"n."},{en:"take a trip",cn:"去旅行",ph:"/",pos:"phrase"},{en:"supermarket",cn:"超市",ph:"/ˈsuːpmɑːkɪt/",pos:"n."},{en:"evening",cn:"晚上;傍晚",ph:"/ˈiːvnɪŋ/",pos:"n."},{en:"tonight",cn:"在今晚",ph:"/təˈnaɪt/",pos:"adv."},{en:"tomorrow",cn:"明天",ph:"/təˈmɒrəʊ/",pos:"adv."},{en:"next week",cn:"下周",ph:"/",pos:"phrase"},{en:"dictionary",cn:"词典",ph:"/ˈdɪkʃənri/",pos:"n."},{en:"comic",cn:"滑稽的",ph:"/ˈkɒmɪk/",pos:"adj."},{en:"comic book",cn:"连环画册",ph:"/",pos:"n."},{en:"word",cn:"单词",ph:"/wɜːd/",pos:"n."},{en:"word book",cn:"单词书",ph:"/",pos:"n."},{en:"postcard",cn:"明信片",ph:"/ˈpəʊstkɑːd/",pos:"n."},{en:"lesson",cn:"课",ph:"/ˈlesn/",pos:"n."},{en:"space",cn:"太空",ph:"/speɪs/",pos:"n."},{en:"travel",cn:"旅行",ph:"/ˈtrævl/",pos:"v."},{en:"half",cn:"一半",ph:"/hɑːf/",pos:"adj."},{en:"price",cn:"价格",ph:"/praɪs/",pos:"n."},{en:"Mid-Autumn Festival",cn:"中秋节",ph:"/",pos:"n."},{en:"together",cn:"一起",ph:"/təˈɡeðə(r)/",pos:"adv."},{en:"get together",cn:"聚会",ph:"/",pos:"phrase"},{en:"mooncake",cn:"月饼",ph:"/ˈmuːnkeɪk/",pos:"n."},{en:"poem",cn:"诗",ph:"/ˈpəʊɪm/",pos:"n."},{en:"moon",cn:"月亮",ph:"/muːn/",pos:"n."},{en:"studies",cn:"学习",ph:"/ˈstʌdiz/",pos:"v."},{en:"puzzle",cn:"谜",ph:"/ˈpʌzl/",pos:"n."},{en:"hiking",cn:"远足",ph:"/ˈhaɪkɪŋ/",pos:"n."},{en:"pen pal",cn:"笔友",ph:"/",pos:"n."},{en:"hobby",cn:"业余爱好",ph:"/ˈhɒbi/",pos:"n."},{en:"jasmine",cn:"茉莉",ph:"/ˈdʒæzmɪn/",pos:"n."},{en:"idea",cn:"想法;主意",ph:"/aɪˈdɪə/",pos:"n."},{en:"amazing",cn:"令人惊奇的",ph:"/əˈmeɪzɪŋ/",pos:"adj."},{en:"shall",cn:"征求意见",ph:"/ʃæl/",pos:"v."},{en:"goal",cn:"射门",ph:"/ɡəʊl/",pos:"n."},{en:"join",cn:"加入",ph:"/dʒɔɪn/",pos:"v."},{en:"club",cn:"俱乐部",ph:"/klʌb/",pos:"n."},{en:"share",cn:"分享",ph:"/ʃeə(r)/",pos:"v."},{en:"factory",cn:"工厂",ph:"/ˈfæktri/",pos:"n."},{en:"worker",cn:"工人",ph:"/ˈwɜːkə(r)/",pos:"n."},{en:"postman",cn:"邮递员",ph:"/ˈpəʊstmən/",pos:"n."},{en:"businessman",cn:"商人",ph:"/ˈbɪznəsmæn/",pos:"n."},{en:"police officer",cn:"警察",ph:"/",pos:"n."},{en:"fisherman",cn:"渔民",ph:"/ˈfɪʃəmən/",pos:"n."},{en:"scientist",cn:"科学家",ph:"/ˈsaɪəntɪst/",pos:"n."},{en:"pilot",cn:"飞行员",ph:"/ˈpaɪlət/",pos:"n."},{en:"coach",cn:"教练",ph:"/kəʊtʃ/",pos:"n."},{en:"country",cn:"国家",ph:"/ˈkʌntri/",pos:"n."},{en:"head teacher",cn:"校长",ph:"/",pos:"n."},{en:"sea",cn:"大海",ph:"/siː/",pos:"n."},{en:"stay",cn:"保持",ph:"/steɪ/",pos:"v."},{en:"university",cn:"大学",ph:"/ˌjuːnɪˈvɜːsəti/",pos:"n."},{en:"gym",cn:"体育馆",ph:"/dʒɪm/",pos:"n."},{en:"if",cn:"如果",ph:"/ɪf/",pos:"conj."},{en:"reporter",cn:"记者",ph:"/rɪˈpɔːtə(r)/",pos:"n."},{en:"use",cn:"使用",ph:"/juːz/",pos:"v."},{en:"type",cn:"打字",ph:"/taɪp/",pos:"v."},{en:"quickly",cn:"迅速地",ph:"/ˈkwɪkli/",pos:"adv."},{en:"secretary",cn:"秘书",ph:"/ˈsekrətri/",pos:"n."},{en:"angry",cn:"生气的",ph:"/ˈæŋɡri/",pos:"adj."},{en:"afraid",cn:"害怕",ph:"/əˈfreɪd/",pos:"adj."},{en:"sad",cn:"难过的",ph:"/sæd/",pos:"adj."},{en:"worried",cn:"担心的;发愁的",ph:"/ˈwʌrid/",pos:"adj."},{en:"happy",cn:"高兴的",ph:"/ˈhæpi/",pos:"adj."},{en:"see a doctor",cn:"看病",ph:"/",pos:"phrase"},{en:"wear",cn:"穿",ph:"/weə(r)/",pos:"v."},{en:"more",cn:"更多的",ph:"/mɔː(r)/",pos:"adj."},{en:"deep",cn:"深的",ph:"/diːp/",pos:"adj."},{en:"breath",cn:"呼吸",ph:"/breθ/",pos:"n."},{en:"take a deep breath",cn:"深呼吸",ph:"/",pos:"phrase"},{en:"count",cn:"数数",ph:"/kaʊnt/",pos:"v."},{en:"count to ten",cn:"数到十",ph:"/",pos:"phrase"},{en:"chase",cn:"追赶",ph:"/tʃeɪs/",pos:"v."},{en:"mice",cn:"老鼠(复数)",ph:"/maɪs/",pos:"n."},{en:"bad",cn:"邪恶的;坏的",ph:"/bæd/",pos:"adj."},{en:"hurt",cn:"受伤",ph:"/hɜːt/",pos:"v."},{en:"ill",cn:"有病;不舒服",ph:"/ɪl/",pos:"adj."},{en:"wrong",cn:"有毛病",ph:"/rɒŋ/",pos:"adj."},{en:"should",cn:"应该",ph:"/ʃʊd/",pos:"v."},{en:"feel",cn:"觉得;感到",ph:"/fiːl/",pos:"v."},{en:"well",cn:"健康;身体好",ph:"/wel/",pos:"adj."},{en:"sit",cn:"坐",ph:"/sɪt/",pos:"v."},{en:"grass",cn:"草坪",ph:"/ɡrɑːs/",pos:"n."},{en:"hear",cn:"听见",ph:"/hɪə(r)/",pos:"v."},{en:"ant",cn:"蚂蚁",ph:"/ænt/",pos:"n."},{en:"worry",cn:"担心;担忧",ph:"/ˈwʌri/",pos:"v."},{en:"stuck",cn:"陷住;无法移动",ph:"/stʌk/",pos:"adj."},{en:"mud",cn:"泥",ph:"/mʌd/",pos:"n."},{en:"pull",cn:"拉;拽",ph:"/pʊl/",pos:"v."},{en:"everyone",cn:"每人",ph:"/ˈevriwʌn/",pos:"pron."}
+]},
+"6B": { name: "六年级下册", words: [
+    {en:"younger",cn:"更年轻的",ph:"/ˈjʌŋɡə(r)/",pos:"adj."},{en:"older",cn:"更年长的",ph:"/ˈəʊldə(r)/",pos:"adj."},{en:"taller",cn:"更高的",ph:"/ˈtɔːlə(r)/",pos:"adj."},{en:"shorter",cn:"更矮的;更短的",ph:"/ˈʃɔːtə(r)/",pos:"adj."},{en:"longer",cn:"更长的",ph:"/ˈlɒŋɡə(r)/",pos:"adj."},{en:"thinner",cn:"更瘦的",ph:"/ˈθɪnə(r)/",pos:"adj."},{en:"heavier",cn:"更重的",ph:"/ˈheviə(r)/",pos:"adj."},{en:"bigger",cn:"更大的",ph:"/ˈbɪɡə(r)/",pos:"adj."},{en:"smaller",cn:"更小的",ph:"/ˈsmɔːlə(r)/",pos:"adj."},{en:"stronger",cn:"更强壮的",ph:"/ˈstrɒŋɡə(r)/",pos:"adj."},{en:"dinosaur",cn:"恐龙",ph:"/ˈdaɪnəsɔː(r)/",pos:"n."},{en:"hall",cn:"大厅",ph:"/hɔːl/",pos:"n."},{en:"metre",cn:"米",ph:"/ˈmiːtə(r)/",pos:"n."},{en:"than",cn:"比",ph:"/ðæn/",pos:"conj."},{en:"both",cn:"两个都",ph:"/bəʊθ/",pos:"adj."},{en:"kilogram",cn:"千克;公斤",ph:"/ˈkɪləɡræm/",pos:"n."},{en:"countryside",cn:"乡村",ph:"/ˈkʌntrisaɪd/",pos:"n."},{en:"lower",cn:"更低的",ph:"/ˈləʊə(r)/",pos:"adj."},{en:"shadow",cn:"阴影;影子",ph:"/ˈʃædəʊ/",pos:"n."},{en:"smarter",cn:"更聪明的",ph:"/ˈsmɑːtə(r)/",pos:"adj."},{en:"become",cn:"变成",ph:"/bɪˈkʌm/",pos:"v."},{en:"cleaned",cn:"打扫(过去式)",ph:"/kliːnd/",pos:"v."},{en:"stayed",cn:"停留;呆(过去式)",ph:"/steɪd/",pos:"v."},{en:"washed",cn:"洗(过去式)",ph:"/wɒʃt/",pos:"v."},{en:"watched",cn:"看(过去式)",ph:"/wɒtʃt/",pos:"v."},{en:"had",cn:"患病;得病",ph:"/hæd/",pos:"v."},{en:"had a cold",cn:"感冒",ph:"/",pos:"phrase"},{en:"slept",cn:"睡觉(过去式)",ph:"/slept/",pos:"v."},{en:"read",cn:"读(过去式)",ph:"/red/",pos:"v."},{en:"saw",cn:"看见(过去式)",ph:"/sɔː/",pos:"v."},{en:"last",cn:"最近的",ph:"/lɑːst/",pos:"adj."},{en:"yesterday",cn:"昨天",ph:"/ˈjestədeɪ/",pos:"n."},{en:"before",cn:"在……之前",ph:"/bɪˈfɔː(r)/",pos:"prep."},{en:"drank",cn:"喝(过去式)",ph:"/dræŋk/",pos:"v."},{en:"show",cn:"演出",ph:"/ʃəʊ/",pos:"n."},{en:"magazine",cn:"杂志",ph:"/ˌmæɡəˈziːn/",pos:"n."},{en:"better",cn:"更好的",ph:"/ˈbetə(r)/",pos:"adj."},{en:"faster",cn:"更快的",ph:"/ˈfɑːstə(r)/",pos:"adj."},{en:"hotel",cn:"旅馆",ph:"/həʊˈtel/",pos:"n."},{en:"fixed",cn:"修理(过去式)",ph:"/fɪkst/",pos:"v."},{en:"broken",cn:"破损的",ph:"/ˈbrəʊkən/",pos:"adj."},{en:"lamp",cn:"台灯",ph:"/læmp/",pos:"n."},{en:"loud",cn:"大声的",ph:"/laʊd/",pos:"adj."},{en:"enjoy",cn:"喜爱",ph:"/ɪnˈdʒɔɪ/",pos:"v."},{en:"went",cn:"去(过去式)",ph:"/went/",pos:"v."},{en:"camp",cn:"野营",ph:"/kæmp/",pos:"n."},{en:"went camping",cn:"去野营",ph:"/",pos:"phrase"},{en:"fish",cn:"钓鱼",ph:"/fɪʃ/",pos:"v."},{en:"went fishing",cn:"去钓鱼",ph:"/",pos:"phrase"},{en:"rode",cn:"骑(过去式)",ph:"/rəʊd/",pos:"v."},{en:"hurt",cn:"受伤",ph:"/hɜːt/",pos:"v."},{en:"ate",cn:"吃(过去式)",ph:"/et/",pos:"v."},{en:"took",cn:"拍(照)",ph:"/tʊk/",pos:"v."},{en:"took pictures",cn:"照相",ph:"/",pos:"phrase"},{en:"bought",cn:"买(过去式)",ph:"/bɔːt/",pos:"v."},{en:"gift",cn:"礼物",ph:"/ɡɪft/",pos:"n."},{en:"fell",cn:"摔倒",ph:"/fel/",pos:"v."},{en:"off",cn:"落下",ph:"/ɒf/",pos:"prep."},{en:"Labour Day",cn:"劳动节",ph:"/",pos:"n."},{en:"mule",cn:"骡子",ph:"/mjuːl/",pos:"n."},{en:"Turpan",cn:"吐鲁番",ph:"/",pos:"n."},{en:"could",cn:"能",ph:"/kʊd/",pos:"v."},{en:"till",cn:"直到",ph:"/tɪl/",pos:"prep."},{en:"beach",cn:"沙滩",ph:"/biːtʃ/",pos:"n."},{en:"basket",cn:"篮;框",ph:"/ˈbɑːskɪt/",pos:"n."},{en:"part",cn:"角色",ph:"/pɑːt/",pos:"n."},{en:"licked",cn:"舔(过去式)",ph:"/lɪkt/",pos:"v."},{en:"laughed",cn:"笑(过去式)",ph:"/lɑːft/",pos:"v."},{en:"dining hall",cn:"饭厅",ph:"/",pos:"n."},{en:"grass",cn:"草坪",ph:"/ɡrɑːs/",pos:"n."},{en:"gym",cn:"体育馆",ph:"/dʒɪm/",pos:"n."},{en:"ago",cn:"以前",ph:"/əˈɡəʊ/",pos:"adv."},{en:"cycling",cn:"骑自行车运动",ph:"/ˈsaɪklɪŋ/",pos:"n."},{en:"go cycling",cn:"去骑自行车",ph:"/",pos:"phrase"},{en:"ice-skate",cn:"滑冰",ph:"/ˈaɪs skeɪt/",pos:"v."},{en:"badminton",cn:"羽毛球运动",ph:"/ˈbædmɪntən/",pos:"n."},{en:"star",cn:"星",ph:"/stɑː(r)/",pos:"n."},{en:"easy",cn:"容易的",ph:"/ˈiːzi/",pos:"adj."},{en:"look up",cn:"查阅",ph:"/",pos:"phrase"},{en:"Internet",cn:"互联网",ph:"/ˈɪntənet/",pos:"n."},{en:"different",cn:"不同的",ph:"/ˈdɪfrənt/",pos:"adj."},{en:"active",cn:"积极的;活跃的",ph:"/ˈæktɪv/",pos:"adj."},{en:"race",cn:"赛跑",ph:"/reɪs/",pos:"n."},{en:"nothing",cn:"没有什么",ph:"/ˈnʌθɪŋ/",pos:"pron."},{en:"thought",cn:"想(过去式)",ph:"/θɔːt/",pos:"v."},{en:"felt",cn:"觉得(过去式)",ph:"/felt/",pos:"v."},{en:"cheetah",cn:"猎豹",ph:"/ˈtʃiːtə/",pos:"n."},{en:"trip",cn:"绊倒",ph:"/trɪp/",pos:"v."},{en:"woke",cn:"醒(过去式)",ph:"/wəʊk/",pos:"v."},{en:"dream",cn:"梦",ph:"/driːm/",pos:"n."}
+]}};
+
+// === 核心逻辑控制 ===
+var currentGrade = "3A";
+var currentIndex = 0;
+var isFlipped = false;
+var currentMode = "mem";
+var stats = { total: 0, known: 0, wrong: 0 };
+var wrongList = [];
+
+// 初始化界面
+function init() {
+    const sel = document.getElementById('selGrade');
+    sel.innerHTML = Object.keys(RAW_DATA).map(k => `<option value="${k}">${RAW_DATA[k].name}</option>`).join('');
+    loadGrade("3A");
+}
+
+// 切换学期
+function loadGrade(gradeKey) {
+    currentGrade = gradeKey;
+    currentIndex = 0;
+    render();
+}
+
+function onGradeChange() {
+    loadGrade(document.getElementById('selGrade').value);
+}
+
+// 渲染当前单词
+function render() {
+    const list = RAW_DATA[currentGrade].words;
+    const word = list[currentIndex];
+
+    // 更新内容
+    document.getElementById('wEn').textContent = word.en;
+    document.getElementById('wPh').textContent = word.ph || "";
+    document.getElementById('wCn').textContent = word.cn;
+    document.getElementById('wPos').textContent = word.pos || "";
+
+    // 更新进度条
+    document.getElementById('pLabel').textContent = `进度: ${currentIndex + 1} / ${list.length}`;
+    document.getElementById('uLabel').textContent = RAW_DATA[currentGrade].name;
+    document.getElementById('pBar').style.width = ((currentIndex + 1) / list.length * 100) + "%";
+
+    resetCard();
+    if(currentMode === 'test') prepareTest();
+}
+
+// 翻转逻辑
+function doFlip() {
+    isFlipped = !isFlipped;
+    document.getElementById('cardBox').classList.toggle('flipped', isFlipped);
+}
+function resetCard() {
+    isFlipped = false;
+    document.getElementById('cardBox').classList.remove('flipped');
+}
+function onCardTap() { if(currentMode === 'mem') doFlip(); }
+
+// 切换单词
+function goPrev() { if(currentIndex > 0) { currentIndex--; render(); } }
+function goNext() {
+    if(currentIndex < RAW_DATA[currentGrade].words.length - 1) {
+        currentIndex++; render();
+    } else {
+        alert("本学期单词已全部学完！🎉");
+    }
+}
+
+// 记忆模式：手动标记
+function doMark(isKnown) {
+    stats.total++;
+    if(isKnown) {
+        stats.known++;
+    } else {
+        stats.wrong++;
+        addWrong(RAW_DATA[currentGrade].words[currentIndex]);
+    }
+    updateStats();
+    goNext();
+}
+
+// 更新统计
+function updateStats() {
+    document.getElementById('stT').textContent = stats.total;
+    document.getElementById('stK').textContent = stats.known;
+    document.getElementById('stX').textContent = stats.wrong;
+    const rate = stats.total ? Math.round(stats.known / stats.total * 100) : 0;
+    document.getElementById('stR').textContent = rate + "%";
+}
+
+// 添加错题
+function addWrong(word) {
+    if(!wrongList.some(w => w.en === word.en)) {
+        wrongList.push(word);
+    }
+}
+
+// 模式切换
+function setMode(m) {
+    currentMode = m;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+    document.getElementById('cardArea').style.display = (m === 'mem') ? 'block' : 'none';
+    document.getElementById('testArea').style.display = (m === 'test') ? 'block' : 'none';
+    document.getElementById('revArea').style.display = (m === 'rev') ? 'block' : 'none';
+
+    if(m === 'mem') document.getElementById('tMem').classList.add('on');
+    if(m === 'test') { document.getElementById('tTest').classList.add('on'); render(); }
+    if(m === 'rev') {
+        document.getElementById('tRev').classList.add('on');
+        const list = document.getElementById('revList');
+        list.innerHTML = wrongList.length ?
+            wrongList.map((w, i) => `<div>${i+1}. <b>${w.en}</b> - ${w.cn}</div>`).join('') :
+            '<div style="text-align:center;color:#999;padding:20px">暂无错题，继续加油！</div>';
+    }
+}
+
+// 测试功能
+function prepareTest() {
+    const word = RAW_DATA[currentGrade].words[currentIndex];
+    document.getElementById('tQ').textContent = word.cn + " = ?";
+    document.getElementById('tIn').value = "";
+    document.getElementById('tIn').focus();
+}
+
+function doCheck() {
+    const ans = document.getElementById('tIn').value.trim().toLowerCase();
+    const correct = RAW_DATA[currentGrade].words[currentIndex].en.toLowerCase();
+    stats.total++;
+    if(ans === correct) {
+        alert("✅ 正确！");
+        stats.known++;
+    } else {
+        alert("❌ 错误！正确拼写是: " + correct);
+        stats.wrong++;
+        addWrong(RAW_DATA[currentGrade].words[currentIndex]);
+    }
+    updateStats();
+    goNext();
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
